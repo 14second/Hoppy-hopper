@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Hoppy Hopper</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #7ec86e; overflow: hidden;
+    font-family: system-ui, sans-serif; }
+  canvas { display: block; margin: 0 auto; touch-action: none; }
+  #hud { position: fixed; top: 12px; left: 16px; color: #fff; font-size: 22px;
+    font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+  #over { position: fixed; inset: 0; display: none; align-items: center;
+    justify-content: center; background: rgba(15,15,20,.72); color: #fff;
+    font-size: 34px; font-weight: 800; text-align: center; }
+</style>
+</head>
+<body>
+<div id="hud">Score <span id="score">0</span></div>
+<div id="over">SPLAT!<br><span style="font-size:20px">tap to hop again</span></div>
+<canvas id="g"></canvas>
+<script>
+// Hoppy Hopper — a tiny Crossy-Road-style hopping game in ~110 lines.
+const cv = document.getElementById('g'), ctx = cv.getContext('2d');
+const ROWS = 9, PLAYER_ROW = 2;
+let W, H, laneH;
+function size() {
+  W = cv.width = Math.min(520, innerWidth);
+  H = cv.height = innerHeight;
+  laneH = H / ROWS;
+}
+addEventListener('resize', size); size();
+
+const rnd = Math.random;
+let lanes = [], playerLane = 0, score = 0, dead = false, last = 0;
+
+function makeLane(i) {
+  const road = i > 0 && rnd() < 0.65;
+  const cars = [];
+  if (road) {
+    const n = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < n; k++) cars.push(rnd());
+  }
+  return { road, dir: rnd() < 0.5 ? -1 : 1,
+           speed: 0.12 + rnd() * 0.30, cars };
+}
+function ensure() {
+  while (lanes.length <= playerLane + ROWS) lanes.push(makeLane(lanes.length));
+}
+function reset() { playerLane = 0; score = 0; dead = false; lanes = []; ensure();
+  document.getElementById('over').style.display = 'none'; }
+function hop() {
+  if (dead) { reset(); return; }
+  playerLane++; score = Math.max(score, playerLane);
+  document.getElementById('score').textContent = score;
+  ensure();
+}
+addEventListener('pointerdown', hop);
+addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') hop(); });
+ensure();
+
+function frame(t) {
+  const dt = Math.min(0.05, (t - last) / 1000 || 0.016); last = t;
+  const cam = playerLane - PLAYER_ROW;
+  if (!dead) {
+    for (const l of lanes) {
+      if (!l.road) continue;
+      for (let k = 0; k < l.cars.length; k++) {
+        let x = l.cars[k] + l.dir * l.speed * dt;
+        if (x > 1.15) x -= 1.30;
+        if (x < -0.15) x += 1.30;
+        l.cars[k] = x;
+      }
+    }
+    const pl = lanes[playerLane];
+    if (pl.road && pl.cars.some(x => Math.abs(x - 0.5) < 0.15)) {
+      dead = true;
+      document.getElementById('over').style.display = 'flex';
+    }
+  }
+  for (let r = 0; r < ROWS; r++) {
+    const li = cam + r;
+    if (li < 0) continue;
+    const l = lanes[li], top = H - (r + 1) * laneH;
+    ctx.fillStyle = l.road ? '#3c3f46' : (li % 2 ? '#74be66' : '#7ec86e');
+    ctx.fillRect(0, top, W, laneH);
+    if (l.road) {
+      ctx.fillStyle = '#f0c850';
+      for (let d = 0; d < 8; d++)
+        ctx.fillRect(d * W / 8 + 6, top + laneH / 2 - 4, W / 8 - 12, 8);
+      const cols = ['#e65a5a', '#5a8ce6', '#f0b43c'];
+      l.cars.forEach((x, k) => {
+        ctx.fillStyle = cols[k % 3];
+        ctx.beginPath();
+        ctx.roundRect((x - 0.09) * W, top + laneH * 0.22, 0.18 * W, laneH * 0.56, 10);
+        ctx.fill();
+      });
+    }
+  }
+  // the hopper
+  const px = W / 2, py = H - (PLAYER_ROW + 0.5) * laneH, rad = laneH * 0.30;
+  ctx.fillStyle = '#4bb45a';
+  ctx.beginPath(); ctx.arc(px, py, rad, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(px - rad * 0.37, py - rad * 0.2, rad * 0.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(px + rad * 0.37, py - rad * 0.2, rad * 0.3, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1e1e1e';
+  ctx.beginPath(); ctx.arc(px - rad * 0.37, py - rad * 0.2, rad * 0.15, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(px + rad * 0.37, py - rad * 0.2, rad * 0.15, 0, 7); ctx.fill();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
