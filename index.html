@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<div id="hud">Score <span id="score">0</span></div>
+<div id="hud">Score <span id="score">0</span><div id="best" style="font-size:14px;font-weight:600;opacity:.9">Best 0</div></div>
 <div id="over">SPLAT!<br><span style="font-size:20px">tap to hop again</span></div>
 <canvas id="g"></canvas>
 <script>
@@ -33,6 +33,34 @@ addEventListener('resize', size); size();
 
 const rnd = Math.random;
 let lanes = [], playerLane = 0, score = 0, dead = false, last = 0;
+
+// Top-5 score history, persisted in the browser via localStorage.
+const TOP_KEY = 'hoppy-hopper-top5';
+let top5 = [];
+try { top5 = JSON.parse(localStorage.getItem(TOP_KEY)) || []; } catch (e) { top5 = []; }
+top5 = top5.filter(n => typeof n === 'number').slice(0, 5);
+function saveTop(s) {
+  if (s <= 0) return;
+  top5.push(s); top5.sort((a, b) => b - a); top5 = top5.slice(0, 5);
+  try { localStorage.setItem(TOP_KEY, JSON.stringify(top5)); } catch (e) {}
+}
+function refreshBest() {
+  document.getElementById('best').textContent = 'Best ' + (top5[0] || 0);
+}
+function showGameOver() {
+  saveTop(score);
+  refreshBest();
+  const medals = ['🥇', '🥈', '🥉', '4.', '5.'];
+  const rows = top5.length
+    ? top5.map((s, i) => `<div style="font-size:19px">${medals[i]} ${s}</div>`).join('')
+    : '<div style="font-size:16px;opacity:.75">No scores yet — hop!</div>';
+  const ov = document.getElementById('over');
+  ov.innerHTML = `SPLAT!<br><span style="font-size:22px">Score ${score}</span>`
+    + `<div style="margin-top:12px;font-size:19px;font-weight:800">TOP 5</div>${rows}`
+    + `<div style="margin-top:12px;font-size:20px">tap to hop again</div>`;
+  ov.style.display = 'flex';
+}
+refreshBest();
 
 function makeLane(i) {
   const road = i > 0 && rnd() < 0.65;
@@ -75,7 +103,7 @@ function frame(t) {
     const pl = lanes[playerLane];
     if (pl.road && pl.cars.some(x => Math.abs(x - 0.5) < 0.15)) {
       dead = true;
-      document.getElementById('over').style.display = 'flex';
+      showGameOver();
     }
   }
   for (let r = 0; r < ROWS; r++) {
